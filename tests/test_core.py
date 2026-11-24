@@ -36,6 +36,26 @@ class CoreTests(unittest.TestCase):
         s.layout = core.HORIZONTAL
         self.assertEqual(core.stitch(imgs, s).size, (324, 54))
 
+    def test_output_size(self):
+        panels = [(s, Image.new("RGB", (1536, 512), "red")) for s in (5, None, -3)]
+        for layout in core.LAYOUTS:
+            self.assertEqual(core.make_showcase(panels, core.Style(layout=layout)).size,
+                             (1552, 1568) if layout == core.VERTICAL else (4640, 528))
+            for w, h in ((800, 1000), (800, 0), (0, 1000), (333, 777), (5000, 5000), (1552, 1568)):
+                size = core.make_showcase(panels, core.Style(layout=layout, out_width=w, out_height=h)).size
+                if w:
+                    self.assertLessEqual(size[0], w)
+                if h:
+                    self.assertLessEqual(size[1], h)
+                # one side comes within rounding (under 1 px per panel) of its limit
+                self.assertTrue((w and w - size[0] <= 3) or (h and h - size[1] <= 3), (layout, w, h, size))
+        self.assertEqual(panels[0][1].size, (1536, 512))
+        self.assertEqual(core.make_showcase(panels, core.Style(out_width=1552, out_height=1568)).size, (1552, 1568))
+
+    def test_output_too_small(self):
+        with self.assertRaises(ValueError):
+            core.check_output_size(3, core.Style(out_height=30))
+
     def test_labels(self):
         s = core.Style()
         self.assertEqual(core.label_text(5, s), "5.0")

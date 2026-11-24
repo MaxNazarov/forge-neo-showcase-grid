@@ -212,6 +212,10 @@ class Script(scripts.Script):
                     c["border"] = gr.Number(label="Border (px)", value=d.border, precision=0, elem_id=eid("border"))
                     c["grid_color"] = gr.ColorPicker(label="Gap and border color", value=d.grid_color, elem_id=eid("grid_color"))
 
+                with gr.Row():
+                    c["out_width"] = gr.Number(label="Output grid width (0 = from generation)", value=d.out_width, precision=0, minimum=0, elem_id=eid("out_width"))
+                    c["out_height"] = gr.Number(label="Output grid height (0 = from generation)", value=d.out_height, precision=0, minimum=0, elem_id=eid("out_height"))
+
                 gr.Markdown("**Label text**")
                 with gr.Row():
                     c["show_labels"] = gr.Checkbox(label="Show labels", value=d.show_labels, elem_id=eid("show_labels"))
@@ -254,9 +258,9 @@ class Script(scripts.Script):
             def on_preview(strengths_text, mode, lora, width, height, *values):
                 try:
                     strengths = core.parse_strengths(strengths_text)
+                    return core.make_preview(strengths, mode, style_from(values), (width, height), get_fonts(), roboto_ttf_file, lora or "LoRA")
                 except ValueError as e:
                     raise gr.Error(str(e))
-                return core.make_preview(strengths, mode, style_from(values), (width, height), get_fonts(), roboto_ttf_file, lora or "LoRA")
 
             def on_save(name, *values):
                 try:
@@ -305,6 +309,8 @@ class Script(scripts.Script):
         preferred_weight, activation = load_sidecar(path)
         strengths = core.parse_strengths(strengths_text) or [preferred_weight]
         panels = core.build_panels(strengths, baseline_mode)
+        if len(panels) > 1:
+            core.check_output_size(len(panels), style)  # fail before generating, not after
 
         # The tested LoRA must not also be applied by a tag already in the prompt.
         names = {path.stem, tag_name}

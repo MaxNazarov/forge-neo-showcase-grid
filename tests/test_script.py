@@ -51,8 +51,8 @@ class ScriptTests(unittest.TestCase):
         self.p = types.SimpleNamespace(prompt="cat <lora:size:1>", hr_prompt="", seed=-1, batch_size=1, n_iter=1,
                                        extra_generation_params={}, outpath_grids="g")
 
-    def run_script(self, strengths="5, -3", mode="By value", lora="size", activation=True):
-        style = self.mod.core.Style()
+    def run_script(self, strengths="5, -3", mode="By value", lora="size", activation=True, **style_kwargs):
+        style = self.mod.core.Style(**style_kwargs)
         values = [getattr(style, k) for k in self.mod.core.STYLE_KEYS]
         return self.mod.Script().run(self.p, False, "", ["/"], lora, strengths, mode, activation, True, *values)
 
@@ -83,6 +83,16 @@ class ScriptTests(unittest.TestCase):
         out = self.run_script()
         self.assertEqual(len(out.images), 3)
         self.assertEqual(out.images[0].height, 30 * 2 + 8 * 3)
+
+    def test_output_size_keeps_single_images(self):
+        out = self.run_script(out_width=61)
+        self.assertEqual(out.images[0].size, (61, 8 * 4 + 15 * 3))
+        self.assertEqual({i.size for i in out.images[1:]}, {(90, 30)})
+
+    def test_too_small_output_fails_before_generating(self):
+        with self.assertRaises(ValueError):
+            self.run_script(out_height=20)
+        self.assertEqual(self.calls, [])
 
     def test_no_lora_generates_normally(self):
         self.run_script(lora=None)

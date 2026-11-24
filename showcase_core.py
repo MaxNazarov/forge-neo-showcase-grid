@@ -141,6 +141,8 @@ def describe_count(strengths_text, baseline_mode) -> str:
 @dataclass
 class Style:
     layout: str = VERTICAL
+    out_width: int = 0  # whole grid, 0 = from generation
+    out_height: int = 0
     gap: int = 8
     border: int = 8
     grid_color: str = "#F2C6C6"
@@ -198,6 +200,7 @@ def make_style(data: dict) -> Style:
 
 
 NUMERIC_LIMITS = {
+    "out_width": (0, 16384), "out_height": (0, 16384),
     "gap": (0, 500), "border": (0, 500), "decimals": (-1, 4), "font_size": (1, 1000),
     "stroke_width": (0, 50), "box_opacity": (0, 100), "box_radius": (0, 500),
     "padding": (0, 200), "margin": (0, 1000),
@@ -300,6 +303,43 @@ def draw_label(img, text, style: Style, fonts: dict, default_font=None):
     return img
 
 
+def check_output_size(count, style: Style):
+    """Raises ValueError when gaps and borders leave no room for the panels."""
+    gaps = style.gap * (count - 1)
+    vertical = style.layout == VERTICAL
+    need_w = 2 * style.border + (1 if vertical else count + gaps)
+    need_h = 2 * style.border + (count + gaps if vertical else 1)
+    for name, limit, need in (("width", style.out_width, need_w), ("height", style.out_height, need_h)):
+        if limit and limit < need:
+            raise ValueError(f"Output {name} {limit} is too small: borders and gaps for {count} panels need at least {need} px")
+
+
+def fit_images(imgs, style: Style):
+    """Scales all images by one factor so the whole grid, with gaps and borders, fits the output size."""
+    if not imgs or not (style.out_width or style.out_height):
+        return list(imgs)
+    check_output_size(len(imgs), style)
+    gaps = style.gap * (len(imgs) - 1)
+    vertical = style.layout == VERTICAL
+    if vertical:
+        total_w, total_h = max(i.width for i in imgs), sum(i.height for i in imgs)
+    else:
+        total_w, total_h = sum(i.width for i in imgs), max(i.height for i in imgs)
+    scales = []
+    if style.out_width:
+        scales.append((style.out_width - 2 * style.border - (0 if vertical else gaps)) / total_w)
+    if style.out_height:
+        scales.append((style.out_height - 2 * style.border - (gaps if vertical else 0)) / total_h)
+    scale = min(scales)
+
+    def resize(img):
+        # Rounded down (1e-9 absorbs float error) so the sum never exceeds the limit.
+        size = tuple(max(1, int(v * scale + 1e-9)) for v in img.size)
+        return img if size == img.size else img.convert("RGB").resize(size, Image.Resampling.LANCZOS)
+
+    return [resize(img) for img in imgs]
+
+
 def stitch(imgs, style: Style):
     """Joins images in one column or row at their own size; smaller ones are centred."""
     if not imgs:
@@ -327,7 +367,8 @@ def stitch(imgs, style: Style):
 def make_showcase(panels, style: Style, fonts=None, default_font=None, lora_name=""):
     """panels: list of (strength or None, image). The given images are not changed."""
     imgs = []
-    for strength, img in panels:
+    fitted = fit_images([img for _, img in panels], style)  # before labels, so text stays sharp
+    for (strength, _), img in zip(panels, fitted):
         if style.show_labels:
             img = draw_label(img, label_text(strength, style, lora_name), style, fonts or {}, default_font)
         imgs.append(img)

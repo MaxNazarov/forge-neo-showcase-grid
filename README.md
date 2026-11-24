@@ -11,10 +11,11 @@ Renders one prompt and seed at several strengths of one LoRA, optionally without
 3. Choose where the **No LoRA** image goes: off, by value (where 0 belongs), first or last.
 4. Adjust **Style**, check it with **Preview style**, then **Generate**.
 
-Images are not cropped or resized. For wide panels set a wide size, e.g. 1536×512.
+Images are never cropped. For wide panels generate at a wide size, e.g. 1536×512.
 
 ## Style
 - **Grid:** vertical / horizontal, gap, border, color.
+- **Output grid width / height:** the whole grid, including gaps and borders, is fitted inside this size. Images are scaled up or down together and keep their proportions, so one side may end up smaller. 0 = no limit on that side; both 0 = size from generation. Individual images keep their size.
 - **Text:** label template (`{strength}`, `{lora}`), No LoRA text, decimals, 9 positions, font, size (pixels or % of the image's short side), color, outline.
 - **Box:** on/off, color, opacity, corner radius, padding, distance from the edge.
 - **Presets:** saved in `presets/`. To delete one, delete its file.
